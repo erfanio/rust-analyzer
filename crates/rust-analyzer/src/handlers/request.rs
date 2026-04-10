@@ -2442,31 +2442,26 @@ fn run_rustfmt(
         }
         RustfmtConfig::CustomCommand { command, args } => {
             let cmd = Utf8PathBuf::from(&command);
-            let target_spec =
-                crates.first().and_then(|&crate_id| snap.target_spec_for_file(file_id, crate_id));
             let extra_env = snap.config.extra_env(source_root_id);
-            let mut cmd = match target_spec {
-                Some(TargetSpec::Cargo(_)) => {
-                    // approach: if the command name contains a path separator, join it with the project root.
-                    // however, if the path is absolute, joining will result in the absolute path being preserved.
-                    // as a fallback, rely on $PATH-based discovery.
-                    let cmd_path = if command.contains(std::path::MAIN_SEPARATOR)
-                        || (cfg!(windows) && command.contains('/'))
-                    {
-                        let project_root = Utf8PathBuf::from_path_buf(current_dir.clone())
-                            .ok()
-                            .and_then(|p| AbsPathBuf::try_from(p).ok());
-                        let project_root = project_root
-                            .as_ref()
-                            .map(|dir| snap.config.workspace_root_for(dir))
-                            .unwrap_or(snap.config.default_root_path());
-                        project_root.join(cmd).into()
-                    } else {
-                        cmd
-                    };
-                    toolchain::command(cmd_path, current_dir, extra_env)
-                }
-                _ => toolchain::command(cmd, current_dir, extra_env),
+            // approach: if the command name contains a path separator, join it with the project root.
+            // however, if the path is absolute, joining will result in the absolute path being preserved.
+            // as a fallback, rely on $PATH-based discovery.
+            let mut cmd = {
+                let cmd_path = if command.contains(std::path::MAIN_SEPARATOR)
+                    || (cfg!(windows) && command.contains('/'))
+                {
+                    let project_root = Utf8PathBuf::from_path_buf(current_dir.clone())
+                        .ok()
+                        .and_then(|p| AbsPathBuf::try_from(p).ok());
+                    let project_root = project_root
+                        .as_ref()
+                        .map(|dir| snap.config.workspace_root_for(dir))
+                        .unwrap_or(snap.config.default_root_path());
+                    project_root.join(cmd).into()
+                } else {
+                    cmd
+                };
+                toolchain::command(cmd_path, current_dir, extra_env)
             };
 
             cmd.args(args);
